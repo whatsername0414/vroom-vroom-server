@@ -1,25 +1,29 @@
 import express from "express";
-import Category from "../models/Category.js";
-Category;
+import repository from "../repositories/categories.js";
 
 const router = express.Router();
 
 //CREATE
-router.post("/", async (req, res) => {
-  try {
-  } catch (error) {
-    res.status(500).json(error);
+router.post("/", (req, res) => {
+  if (req.headers.authorization) {
+    const name = req.body.name;
+    const imageUrl = req.body.imageUrl;
+    const type = req.body.type;
+    const promise = repository.createCategory(name, imageUrl, type);
+    promise.then((category) => {
+      res.status(201).json({ data: category });
+    });
+  } else {
+    throw new Error("Authorization header must be provided");
   }
 });
 
 //READ
-router.get("/", async (req, res) => {
-  try {
-    const categories = await Category.find({ type: req.query.type });
-    res.status(200).json(categories);
-  } catch (error) {
-    res.status(500).json(error);
-  }
+router.get("/", (req, res) => {
+  const type = req.query.type;
+  repository.categories(type).then((categories) => {
+    res.status(200).json({ data: categories });
+  });
 });
 
 export default router;

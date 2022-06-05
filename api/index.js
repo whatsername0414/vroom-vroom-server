@@ -32,6 +32,15 @@ app.use("/api/v1/users", users);
 app.use("/api/v1/orders", orders);
 app.use("/api/v1/merchants", merchants);
 app.use("/api/v1/categories", categories);
+app.use((err, req, res, next) => {
+  const errorStatus = err.status || 500;
+  const errorMessage = err.message || "Something went wrong";
+  return res.status(errorStatus).json({
+    c: errorStatus,
+    m: errorMessage,
+    s: err.stack || null,
+  });
+});
 
 app.listen(port, () => {
   connect();
