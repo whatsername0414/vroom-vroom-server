@@ -4,6 +4,7 @@ const UserSchema = new mongoose.Schema({
   _id: String,
   name: String,
   email: String,
+  push_token: String,
   phone: {
     number: String,
     verified: {

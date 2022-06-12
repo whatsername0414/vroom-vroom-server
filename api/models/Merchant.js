@@ -37,7 +37,7 @@ const ReviewSchema = new mongoose.Schema({
     ref: "User",
   },
   rate: Number,
-  _review: String,
+  comment: String,
   created_at: {
     type: Date,
     default: () => Date.now(),
