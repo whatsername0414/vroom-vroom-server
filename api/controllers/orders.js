@@ -1,6 +1,5 @@
 import Order from "../models/Order.js";
 import Merchant from "../models/Merchant.js";
-import checkAuth from "../utils/check-auth.js";
 
 export const getOrders = async (req, res) => {
   const { status } = req.query;
