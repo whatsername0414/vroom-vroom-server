@@ -1,19 +1,41 @@
-import express from "express";
-import auth from "../middleware/auth.js";
+import express from 'express';
+import { upload } from '../middleware/mutler.js';
+import { auth } from '../middleware/auth.js';
+import { merchantMiddleware } from '../middleware/merchantMiddleware.js';
 import {
   getMerchant,
   getMerchants,
   getFavorites,
   favorite,
   createMerchant,
-} from "../controllers/merchants.js";
+  updateMerchant,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  addProductSection,
+  editProductSection,
+  deleteProductSection,
+} from '../controllers/merchants.js';
 
 const router = express.Router();
 
-router.get("/", getMerchants);
-router.post("/", auth, createMerchant);
-router.put("/:id/favorite", auth, favorite);
-router.get("/favorites", auth, getFavorites);
-router.get("/:id", getMerchant);
+router
+  .route('/:id/products/:productSectionId/:productId')
+  .put(auth, upload, updateProduct)
+  .delete(auth, deleteProduct);
+router.get('/', getMerchants, merchantMiddleware);
+router.post('/', auth, createMerchant, merchantMiddleware);
+router.post('/:id/products/:productSectionId', auth, upload, createProduct);
+router.put('/:id/favorite', auth, favorite);
+router.get('/favorites', auth, getFavorites, merchantMiddleware);
+router
+  .route('/:id')
+  .get(getMerchant, merchantMiddleware)
+  .patch(auth, updateMerchant, merchantMiddleware)
+  .post(auth, addProductSection, merchantMiddleware);
+router
+  .route('/:id/:productSectionId')
+  .put(auth, editProductSection, merchantMiddleware)
+  .delete(auth, deleteProductSection, merchantMiddleware);
 
 export default router;

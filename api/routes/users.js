@@ -1,20 +1,20 @@
 import express from "express";
-import auth from "../middleware/auth.js";
+import { auth } from "../middleware/auth.js";
 import {
+  getUsers,
   getUser,
-  register,
   updateName,
   updateAddress,
-  registerPhoneNumber,
-  verifyOtp,
+  generatePhoneOtp,
+  verifyPhoneOtp,
 } from "../controllers/users.js";
 
 const router = express.Router();
 
-router.get("/", auth, getUser);
-router.post("/", auth, register);
-router.patch("/update-name", auth, updateName);
-router.post("/register-phone-number", auth, registerPhoneNumber);
-router.post("/verify", auth, verifyOtp);
+router.get("/", auth, getUsers);
+router.get("/me", auth, getUser);
+router.patch("/me/update-name", auth, updateName);
+router.post("/me/phone-otp", auth, generatePhoneOtp);
+router.post("/me/verify-phone-otp", auth, verifyPhoneOtp);
 
 export default router;

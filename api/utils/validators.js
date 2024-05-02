@@ -1,7 +1,12 @@
-module.exports.validateRegisterInput = (username, email, password, confirmPassword) => {
+export function validateRegisterInput(
+  username,
+  email,
+  password,
+  confirmPassword
+) {
   const errors = {};
   if (username.trim() === "") {
-    errors.username = "Username must not be empty"
+    errors.username = "Username must not be empty";
   }
   if (email.trim() === "") {
     errors.email = "Email must not be empty";
@@ -22,9 +27,9 @@ module.exports.validateRegisterInput = (username, email, password, confirmPasswo
     errors,
     valid: Object.keys(errors).length < 1,
   };
-};
+}
 
-module.exports.validateLoginInput = (username, password) => {
+export function validateLoginInput(username, password) {
   const errors = {};
   if (username.trim() === "") {
     errors.email = "Username must not be empty";
@@ -37,9 +42,9 @@ module.exports.validateLoginInput = (username, password) => {
     errors,
     valid: Object.keys(errors).length < 1,
   };
-};
+}
 
-module.exports.validateDeliveryInfoInput = (address, city, phoneNumber) => {
+export function validateDeliveryInfoInput(address, city, phoneNumber) {
   const errors = {};
 
   if (address.trim() === "") {
@@ -61,4 +66,4 @@ module.exports.validateDeliveryInfoInput = (address, city, phoneNumber) => {
     errors,
     valid: Object.keys(errors).length < 1,
   };
-};
+}

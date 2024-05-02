@@ -1,11 +1,8 @@
 import mongoose from "mongoose";
 
 const otpSchema = new mongoose.Schema({
-  user: {
-    type: String,
-    ref: "User",
-  },
-  number: String,
+  user: String,
+  receiver: String,
   otp: String,
   created_at: {
     type: Date,

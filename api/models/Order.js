@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const OrderProductSchema = new mongoose.Schema({
   product_id: String,
@@ -7,7 +7,7 @@ const OrderProductSchema = new mongoose.Schema({
   price: Number,
   quantity: Number,
   instructions: String,
-  option: [
+  options: [
     {
       name: String,
       additional_price: Number,
@@ -19,16 +19,20 @@ const OrderProductSchema = new mongoose.Schema({
 const OrderSchema = new mongoose.Schema({
   customer: {
     type: String,
-    ref: "User",
+    ref: 'User',
   },
   merchant: {
     type: mongoose.SchemaTypes.ObjectId,
-    ref: "Merchant",
+    ref: 'Merchant',
+  },
+  rider: {
+    type: String,
+    ref: 'User',
+    default: null,
   },
   payment: {
-    reference: String,
-    method: String,
-    created_at: { type: Date, default: () => Date.now() },
+    type: String,
+    ref: 'Payment',
   },
   delivery_address: {
     address: String,
@@ -42,9 +46,12 @@ const OrderSchema = new mongoose.Schema({
   order_detail: {
     delivery_fee: Number,
     total_price: Number,
-    product: [OrderProductSchema],
+    products: [OrderProductSchema],
   },
-  status: { type: String, default: "Pending" },
+  status: {
+    label: { type: String, default: 'Pending' },
+    ordinal: { type: Number, default: 0 },
+  },
   cancellation_reason: { type: String, default: null },
   created_at: { type: Date, default: () => Date.now() },
   notified: {
@@ -57,4 +64,4 @@ const OrderSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.model("Order", OrderSchema);
+export default mongoose.model('Order', OrderSchema);
