@@ -7,7 +7,6 @@ import cors from 'cors';
 import auth from './routes/auth.js';
 import users from './routes/users.js';
 import orders from './routes/orders.js';
-import payments from './routes/payments.js';
 import merchants from './routes/merchants.js';
 import categories from './routes/categories.js';
 import upload from './routes/upload.js';
@@ -49,13 +48,12 @@ app.use(express.json());
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/users', users);
 app.use('/api/v1/orders', orders);
-app.use('/api/v1/payments', payments);
 app.use('/api/v1/merchants', merchants);
 app.use('/api/v1/categories', categories);
 app.use('/api/v1/upload', upload);
 app.use('/public/images', express.static('public/images'));
 app.use('/api/v1/socket', socket);
-app.use((err, req, res, next) => {
+app.use((err, req, res, D) => {
   const errorStatus = err.status || 500;
   const errorMessage = err.message || 'Something went wrong';
   return res.status(errorStatus).json({

@@ -1,21 +1,5 @@
 import mongoose from 'mongoose';
 
-const OrderProductSchema = new mongoose.Schema({
-  product_id: String,
-  name: String,
-  product_img_url: String,
-  price: Number,
-  quantity: Number,
-  instructions: String,
-  options: [
-    {
-      name: String,
-      additional_price: Number,
-      option_type: String,
-    },
-  ],
-});
-
 const OrderSchema = new mongoose.Schema({
   customer: {
     type: String,
@@ -30,30 +14,40 @@ const OrderSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
-  payment: {
-    type: String,
-    ref: 'Payment',
-  },
-  delivery_address: {
-    address: String,
+  address: {
+    street: {
+      type: String,
+      default: null,
+    },
+    barangay: String,
     city: String,
     additional_information: {
       type: String,
       default: null,
     },
-    coordinates: [Number],
+    latitude: Number,
+    longitude: Number,
   },
-  order_detail: {
-    delivery_fee: Number,
-    total_price: Number,
-    products: [OrderProductSchema],
-  },
-  status: {
-    label: { type: String, default: 'Pending' },
-    ordinal: { type: Number, default: 0 },
-  },
+  products: [
+    {
+      product: {
+        type: mongoose.SchemaTypes.ObjectId,
+        ref: 'Product',
+      },
+      options: [
+        {
+          type: mongoose.SchemaTypes.ObjectId,
+          ref: 'Option',
+        },
+      ],
+      quantity: Number,
+      price: Number,
+      notes: String,
+    },
+  ],
+  delivery_fee: Number,
+  status: { type: Number, default: 0 },
   cancellation_reason: { type: String, default: null },
-  created_at: { type: Date, default: () => Date.now() },
   notified: {
     type: Boolean,
     default: false,
@@ -62,6 +56,7 @@ const OrderSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  created_at: { type: Date, default: () => Date.now() },
 });
 
 export default mongoose.model('Order', OrderSchema);

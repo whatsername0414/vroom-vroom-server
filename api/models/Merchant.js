@@ -1,32 +1,5 @@
 import mongoose from 'mongoose';
 
-const ReviewSchema = new mongoose.Schema({
-  user: {
-    type: String,
-    ref: 'User',
-  },
-  rate: Number,
-  comment: String,
-  created_at: {
-    type: Date,
-    default: () => Date.now(),
-  },
-});
-
-const FavoriteSchema = new mongoose.Schema(
-  {
-    user: {
-      type: String,
-      ref: 'User',
-    },
-    created_at: {
-      type: Date,
-      default: () => Date.now(),
-    },
-  },
-  { _id: false }
-);
-
 const MerchantSchema = new mongoose.Schema({
   name: String,
   image: String,
@@ -49,6 +22,13 @@ const MerchantSchema = new mongoose.Schema({
     type: Date,
     default: () => Date.now(),
   },
+  favorites: [String],
+  reviews: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Review',
+    },
+  ],
 });
 
 export default mongoose.model('Merchant', MerchantSchema);

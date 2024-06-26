@@ -91,17 +91,7 @@ export const registerAdmin = async (req, res) => {
   }
 };
 export const register = async (req, res) => {
-  const {
-    location: { address, city, addInfo, latitude, longitude },
-    fcmToken,
-    type,
-  } = req.body;
-  const location = {
-    address: address ? address : null,
-    city: city ? city : null,
-    additional_information: addInfo ? addInfo : null,
-    coordinates: latitude && longitude ? [(latitude, longitude)] : [0, 0],
-  };
+  const { fcmToken, type } = req.body;
   try {
     const user = await User.findOne({ _id: req.userId });
     if (user) {
@@ -118,12 +108,37 @@ export const register = async (req, res) => {
       }
     } else {
       const newUser = new User({
-        _id: req.userId,
+        user_id: req.userId,
         name: req.name,
         email: req.email,
-        type: type,
         fcm_token: fcmToken,
-        location: location,
+      });
+      const savedUser = await newUser.save();
+      res.status(200).json({ data: savedUser });
+    }
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const registerRider = async (req, res) => {
+  const { name, phone, email } = req.body;
+  try {
+    const user = await User.findOne({ email: email });
+    if (user) {
+      res.status(401).json({
+        data: { message: 'user already exist' },
+      });
+    } else {
+      const newUser = new User({
+        name: name,
+        email: req.email,
+        phone: {
+          verify: true,
+          number: phone,
+        },
       });
       const savedUser = await newUser.save();
       res.status(200).json({ data: savedUser });
@@ -160,7 +175,6 @@ export const generateEmailOtp = async (req, res) => {
     };
     transporter.sendMail(options, (error, _) => {
       if (error) {
-        console.log(error);
         res.status(500).json({ data: { message: 'Something went wrong' } });
         return;
       }

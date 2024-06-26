@@ -3,6 +3,7 @@ import {
   loginAdmin,
   registerAdmin,
   register,
+  registerRider,
   generateEmailOtp,
   vertifyEmailOtp,
 } from '../controllers/auth.js';
@@ -13,6 +14,7 @@ const router = express.Router();
 router.post('/login', loginAdmin);
 router.post('/register/admin', registerAdmin);
 router.post('/register', auth, register);
+router.post('/register/rider', registerRider);
 router.post('/email-otp', generateEmailOtp);
 router.post('/verify-email-otp', vertifyEmailOtp);
 

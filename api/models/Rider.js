@@ -1,10 +1,8 @@
 import mongoose from 'mongoose';
 
-const UserSchema = new mongoose.Schema({
-  _id: String,
+const RiderSchema = new mongoose.Schema({
   name: String,
   email: String,
-  fcm_token: String,
   phone: {
     number: String,
     verified: {
@@ -18,4 +16,4 @@ const UserSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.model('User', UserSchema);
+export default mongoose.model('Rider', RiderSchema);

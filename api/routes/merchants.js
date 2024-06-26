@@ -20,21 +20,24 @@ import {
 const router = express.Router();
 
 router
-  .route('/:id/products/:productSectionId/:productId')
+  .route('/:merchantId/products')
+  .post(auth, upload, createProduct)
   .put(auth, upload, updateProduct)
   .delete(auth, deleteProduct);
-router.get('/', getMerchants, merchantMiddleware);
-router.post('/', auth, createMerchant, merchantMiddleware);
-router.post('/:id/products/:productSectionId', auth, upload, createProduct);
-router.put('/:id/favorite', auth, favorite);
+router
+  .route('/')
+  .get(auth, getMerchants, merchantMiddleware)
+  .post(auth, createMerchant, merchantMiddleware);
+router.get('/unauthorized', getMerchants, merchantMiddleware);
+router.put('/:merchantId/favorite', auth, favorite);
 router.get('/favorites', auth, getFavorites, merchantMiddleware);
 router
-  .route('/:id')
+  .route('/:merchantId')
   .get(getMerchant, merchantMiddleware)
   .patch(auth, updateMerchant, merchantMiddleware)
   .post(auth, addProductSection, merchantMiddleware);
 router
-  .route('/:id/:productSectionId')
+  .route('/:merchantId/:productSectionId')
   .put(auth, editProductSection, merchantMiddleware)
   .delete(auth, deleteProductSection, merchantMiddleware);
 

@@ -1,14 +1,13 @@
-import User from "../models/User.js";
-import Otp from "../models/Otp.js";
-import otpGenerator from "otp-generator";
-import twilio from "twilio";
-import dotenv from "dotenv";
+import User from '../models/User.js';
+import Otp from '../models/Otp.js';
+import otpGenerator from 'otp-generator';
+import twilio from 'twilio';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 export const getUsers = async (req, res) => {
@@ -28,7 +27,7 @@ export const getUser = async (req, res) => {
     if (user) {
       res.status(200).json({ data: user });
     } else {
-      res.status(404).json({ data: { message: "User does not exist" } });
+      res.status(404).json({ data: { message: 'User does not exist' } });
     }
   } catch (error) {
     res.status(500).json({
@@ -45,7 +44,7 @@ export const updateName = async (req, res) => {
       const savedUser = await user.save();
       res.status(200).json({ data: savedUser });
     } else {
-      res.status(404).json({ data: { message: "User does not exist" } });
+      res.status(404).json({ data: { message: 'User does not exist' } });
     }
   } catch (error) {
     res.status(500).json({
@@ -65,7 +64,7 @@ export const updateAddress = async (req, res) => {
       const updatedUser = await user.save();
       res.status(200).json({ data: updatedUser });
     } else {
-      res.status(404).json({ data: { message: "User does not exist" } });
+      res.status(404).json({ data: { message: 'User does not exist' } });
     }
   } catch (error) {
     res.status(500).json({
@@ -82,21 +81,17 @@ export const generatePhoneOtp = async (req, res) => {
       upperCaseAlphabets: false,
       specialChars: false,
     });
-    client.messages.create(
-      {
-        body: `Verification code: ${generatedOtp}`,
-        from: TWILIO_PHONE_NUMBER,
-        to: number,
-      },
-      (error) => console.log(error)
-    );
+    const verification = await client.verify.v2
+      .services('VAe15fe8c3255e483a55f417ad1ca1b618')
+      .verifications.create({ to: number, channel: 'sms' });
+    console.log(verification.sid);
     const otp = new Otp({
       user: req.userId,
-      number: number,
+      receiver: number,
       otp: generatedOtp,
     });
     await otp.save();
-    res.status(201).json({ data: { message: "OTP sent" } });
+    res.status(201).json({ data: { message: 'OTP sent' } });
   } catch (error) {
     res.status(500).json({
       data: { message: error.message },
@@ -110,8 +105,11 @@ export const verifyPhoneOtp = async (req, res) => {
     const otps = await Otp.find({ user: user?._id });
     if (user && otps.length > 0) {
       const currentOtp = otps[otps.length - 1];
-      if (currentOtp.otp === otp) {
-        user.phone.number = currentOtp.number;
+      const verificationChecks = await client.verify.v2
+        .services('VAe15fe8c3255e483a55f417ad1ca1b618')
+        .verificationChecks.create({ to: currentOtp.receiver, code: otp });
+      if (verificationChecks.status === 'approved') {
+        user.phone.number = currentOtp.receiver;
         user.phone.verified = true;
         const savedUser = await user.save();
         await Otp.deleteMany({ user: req.userId });
@@ -119,10 +117,10 @@ export const verifyPhoneOtp = async (req, res) => {
       } else {
         res
           .status(400)
-          .json({ data: { message: "You have entered an invalid code" } });
+          .json({ data: { message: 'You have entered an invalid code' } });
       }
     } else {
-      res.status(404).json({ data: { message: "OTP not found" } });
+      res.status(404).json({ data: { message: 'OTP not found' } });
     }
   } catch (error) {
     res.status(500).json({

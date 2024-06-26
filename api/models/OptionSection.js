@@ -6,7 +6,7 @@ const OptionSectionSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  option: [
+  options: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Option',

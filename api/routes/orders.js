@@ -7,9 +7,8 @@ import {
   createOrder,
   cancelOrder,
   confirmOrder,
-  pickOrder,
-  purchasedOrder,
-  arrived,
+  acceptOrder,
+  pickedupOrder,
   deliveredOrder,
   updateOrderAddress,
   createReview,
@@ -17,14 +16,12 @@ import {
 
 const router = express.Router();
 
-router.get('/', auth, getOrders);
+router.route('/').get(auth, getOrders).post(auth, createOrder);
 router.get('/shipping-fee', auth, getDeliveryFee);
-router.post('/', auth, createOrder);
 router.patch('/:id/cancel', auth, cancelOrder);
 router.patch('/:id/update-address', auth, updateOrderAddress);
-router.patch('/:id/pick', auth, pickOrder);
-router.patch('/:id/purchased', auth, purchasedOrder);
-router.patch('/:id/arrived', auth, arrived);
+router.patch('/:id/accept', auth, acceptOrder);
+router.patch('/:id/pickedup', auth, pickedupOrder);
 router.patch('/:id/delivered', auth, deliveredOrder);
 router.put('/:id/review', auth, createReview);
 router.route('/:id').get(auth, getOrder).patch(auth, confirmOrder);

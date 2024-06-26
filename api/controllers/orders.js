@@ -1,5 +1,5 @@
 import Order from '../models/Order.js';
-import Merchant from '../models/mechant/Merchant.js';
+import Merchant from '../models/Merchant.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 import fetch from 'node-fetch';
@@ -9,18 +9,9 @@ import {
   PENDING,
   CONFIRMED,
   ACCEPTED,
-  PURCHASED,
-  ARRIVED,
+  PICKEDUP,
   DELIVERED,
   CANCELLED,
-  PENDING_NAME,
-  CONFIRMED_NAME,
-  ACCEPTED_NAME,
-  PURCHASED_NAME,
-  ARRIVED_NAME,
-  DELIVERED_NAME,
-  CANCELLED_NAME,
-  CASH_ON_DELIVERY,
 } from '../utils/constrants.js';
 import { getMessaging } from '../utils/messaging.js';
 import dotenv from 'dotenv';
@@ -31,14 +22,16 @@ export const getOrders = async (req, res) => {
   const { type, status } = req?.query;
   let query =
     type === CUSTOMER
-      ? { customer: req.userId, 'status.ordinal': status }
+      ? { customer: req.userId, status: status }
       : type === RIDER || status == PENDING
-      ? { 'status.ordinal': status }
+      ? { status: status }
       : { $unwind: { path: '$orders', preserveNullAndEmptyArrays: true } };
   try {
     const orders = await Order.find(query)
-      .populate('customer', { name: 1, phone: 1 })
-      .populate('merchant', { _id: 1, name: 1, location: 1, img_url: 1 })
+      .populate('customer')
+      .populate('merchant', { product_sections: 0, reviews: 0, favorites: 0 })
+      .populate('products.product', { option_sections: 0 })
+      .populate('products.options')
       .sort({ created_at: -1 });
     res.status(200).json({ data: orders });
   } catch (error) {
@@ -51,8 +44,10 @@ export const getOrder = async (req, res) => {
   const { id } = req.params;
   try {
     const order = await Order.findById(id)
-      .populate('customer', { name: 1, phone: 1 })
-      .populate('merchant', { _id: 1, name: 1, location: 1 });
+      .populate('customer')
+      .populate('merchant', { product_sections: 0, reviews: 0, favorites: 0 })
+      .populate('products.product', { option_sections: 0 })
+      .populate('products.options');
     res.status(200).json({ data: order });
   } catch (error) {
     res.status(500).json({
@@ -61,14 +56,15 @@ export const getOrder = async (req, res) => {
   }
 };
 export const createOrder = async (req, res) => {
-  const { merchantId, payment, deliveryAddress, orderDetail } = req.body;
+  const { merchant, address, products, deliveryFee, notes } = req.body;
   try {
     const newOrder = new Order({
       customer: req.userId,
-      merchant: merchantId,
-      payment: payment,
-      delivery_address: deliveryAddress,
-      order_detail: orderDetail,
+      merchant: merchant,
+      address: address,
+      products: products,
+      delivery_fee: deliveryFee,
+      notes: notes,
     });
     const order = await newOrder.save();
     res.status(201).json({ data: { orderId: order._id } });
@@ -83,8 +79,8 @@ export const cancelOrder = async (req, res) => {
   const { reason } = req.body;
   try {
     const order = await Order.findById(id);
-    if (order && order.status.ordinal === PENDING) {
-      order.status.ordinal = CANCELLED;
+    if (order && order.status === PENDING) {
+      order.status = CANCELLED;
       order.cancellation_reason = reason;
       await order.save();
       res.status(200).json({
@@ -92,7 +88,7 @@ export const cancelOrder = async (req, res) => {
       });
     } else {
       res.status(404).json({
-        data: { message: 'Order does not exist or status was changed' },
+        data: { message: 'Order does not exist or already processed' },
       });
     }
   } catch (error) {
@@ -105,19 +101,20 @@ export const confirmOrder = async (req, res) => {
   const { id } = req.params;
   try {
     const order = await Order.findById(id);
-    if (order && order.status.ordinal == PENDING) {
+    if (order && order.status == PENDING) {
       const updatedOrder = await Order.findByIdAndUpdate(
         id,
         {
           $set: {
-            'status.ordinal': CONFIRMED,
-            'status.label': CONFIRMED_NAME,
+            status: CONFIRMED,
           },
         },
         { new: true }
       )
-        .populate('customer', { name: 1, phone: 1, fcm_token: 1 })
-        .populate('merchant', { _id: 1, name: 1, location: 1 });
+        .populate('customer')
+        .populate('merchant', { product_sections: 0, reviews: 0, favorites: 0 })
+        .populate('products.product', { option_sections: 0 })
+        .populate('products.options');
       const message = {
         data: {
           title: 'Confirmed',
@@ -146,29 +143,48 @@ export const confirmOrder = async (req, res) => {
     });
   }
 };
-//TODO: Notify customer that rider has accepted the order
-export const pickOrder = async (req, res) => {
+
+export const acceptOrder = async (req, res) => {
   const { id } = req.params;
   try {
     const user = await User.findById(req.userId);
     if (user && user.type == RIDER) {
       const order = await Order.findById(id);
-      if (order && order.status.ordinal == CONFIRMED) {
+      if (order && order.status == CONFIRMED) {
         const updatedOrder = await Order.findByIdAndUpdate(
           id,
           {
             $set: {
-              'status.ordinal': ACCEPTED,
-              'status.label': ACCEPTED_NAME,
+              status: ACCEPTED,
               rider: req.userId,
             },
           },
           { new: true }
         )
-          .populate('customer', { name: 1, phone: 1 })
-          .populate('merchant', { _id: 1, name: 1, location: 1 });
+          .populate('customer')
+          .populate('merchant', {
+            product_sections: 0,
+            reviews: 0,
+            favorites: 0,
+          })
+          .populate('products.product', { option_sections: 0 })
+          .populate('products.options');
         user.picked_order = updatedOrder._id;
         await user.save();
+        const message = {
+          data: {
+            title: 'Accepted',
+            body: 'You order has been accepted!',
+          },
+          token: updatedOrder.customer.fcm_token,
+        };
+        getMessaging(message)
+          .then((response) => {
+            console.log('Successfully sent message:', response);
+          })
+          .catch((error) => {
+            console.log('Error sending message:', error);
+          });
         res.status(200).json({
           data: updatedOrder,
         });
@@ -188,7 +204,7 @@ export const pickOrder = async (req, res) => {
     });
   }
 };
-export const purchasedOrder = async (req, res) => {
+export const pickedupOrder = async (req, res) => {
   const { id } = req.params;
   try {
     const user = await User.findById(req.userId);
@@ -196,45 +212,18 @@ export const purchasedOrder = async (req, res) => {
       const order = await Order.findByIdAndUpdate(
         id,
         {
-          $set: { 'status.label': PURCHASED_NAME },
+          $set: { status: PICKEDUP },
         },
         { new: true }
       )
-        .populate('customer', { name: 1, phone: 1 })
-        .populate('merchant', { _id: 1, name: 1, location: 1 });
-      res.status(200).json({
-        data: order,
-      });
-    } else {
-      res.status(401).json({
-        data: { message: 'Invalid credentials' },
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      data: { message: error.message },
-    });
-  }
-};
-//TODO: Notify customer that rider has arrived
-export const arrived = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const user = await User.findById(req.userId);
-    if (user && user.type == RIDER) {
-      const order = await Order.findByIdAndUpdate(
-        id,
-        {
-          $set: { 'status.label': ARRIVED_NAME },
-        },
-        { new: true }
-      )
-        .populate('customer', { name: 1, phone: 1 })
-        .populate('merchant', { _id: 1, name: 1, location: 1 });
+        .populate('customer')
+        .populate('merchant', { product_sections: 0, reviews: 0, favorites: 0 })
+        .populate('products.product', { option_sections: 0 })
+        .populate('products.options');
       const message = {
         notification: {
-          title: 'Arrived',
-          body: 'The rider has arrived at your location!',
+          title: 'Picked Up',
+          body: 'Your order has been picked up!',
         },
         token: updatedOrder.customer.fcm_token,
       };
@@ -246,9 +235,6 @@ export const arrived = async (req, res) => {
           console.log('Error sending message:', error);
         });
       res.status(200).json({
-        data: updatedOrder,
-      });
-      res.status(200).json({
         data: order,
       });
     } else {
@@ -262,7 +248,6 @@ export const arrived = async (req, res) => {
     });
   }
 };
-//TODO: Notify order delivered
 export const deliveredOrder = async (req, res) => {
   const { id } = req.params;
   try {
@@ -271,12 +256,14 @@ export const deliveredOrder = async (req, res) => {
       const order = await Order.findByIdAndUpdate(
         id,
         {
-          $set: { 'status.label': DELIVERED_NAME, 'status.ordinal': DELIVERED },
+          $set: { status: DELIVERED },
         },
         { new: true }
       )
-        .populate('customer', { name: 1, phone: 1 })
-        .populate('merchant', { _id: 1, name: 1, location: 1 });
+        .populate('customer')
+        .populate('merchant', { product_sections: 0, reviews: 0, favorites: 0 })
+        .populate('products.product', { option_sections: 0 })
+        .populate('products.options');
       const message = {
         notification: {
           title: 'Delivered',
@@ -291,9 +278,6 @@ export const deliveredOrder = async (req, res) => {
         .catch((error) => {
           console.log('Error sending message:', error);
         });
-      res.status(200).json({
-        data: updatedOrder,
-      });
       res.status(200).json({
         data: order,
       });
@@ -315,7 +299,7 @@ export const updateOrderAddress = async (req, res) => {
   const { newAddress } = req.body;
   try {
     const order = await Order.findOne({ customer: req.userId, _id: id });
-    if (order && order.status.ordinal === CONFIRMED) {
+    if (order && order.status === CONFIRMED) {
       order.delivery_address = newAddress;
       await order.save();
       res.status(200).json({

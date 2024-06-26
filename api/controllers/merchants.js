@@ -1,148 +1,10 @@
-import Merchant from '../models/mechant/Merchant.js';
-import ProductSection from '../models/mechant/ProductSection.js';
-import Product from '../models/mechant/Product.js';
-import OptionSection from '../models/mechant/OptionSection.js';
-import Option from '../models/mechant/Option.js';
+import Merchant from '../models/Merchant.js';
+import ProductSection from '../models/ProductSection.js';
+import Product from '../models/Product.js';
+import OptionSection from '../models/OptionSection.js';
+import Option from '../models/Option.js';
 import mongoose from 'mongoose';
-import checkAuth from '../utils/check-auth.js';
-
-export const getMerchant = async (req, res, next) => {
-  const { id } = req.params;
-  const userId = req.headers.authorization
-    ? checkAuth(req.headers.authorization)?.sub
-    : undefined;
-  try {
-    const merchant = await Merchant.findById(id)
-      .populate({
-        path: 'categories',
-      })
-      .populate({
-        path: 'product_sections',
-        populate: {
-          path: 'products',
-          populate: {
-            path: 'option_sections',
-            populate: {
-              path: 'option',
-            },
-          },
-        },
-      });
-    req.data = [merchant];
-    next();
-  } catch (error) {
-    res.status(500).json({
-      data: { message: error.message },
-    });
-  }
-};
-
-export const getMerchants = async (req, res, next) => {
-  try {
-    const category = req.query.category;
-    const searchTerm = req.query.searchTerm;
-    const query = category
-      ? { $match: { categories: mongoose.Types.ObjectId(category) } }
-      : searchTerm
-      ? {
-          $search: {
-            index: 'searchMerchants',
-            text: { query: searchTerm, path: { wildcard: '*' }, fuzzy: {} },
-          },
-        }
-      : { $unwind: { path: '$merchants', preserveNullAndEmptyArrays: true } };
-    const merchants = await Merchant.aggregate([
-      query,
-      {
-        $project: {
-          id: '$_id',
-          name: 1,
-          image: 1,
-          rates: 1,
-          categories: 1,
-          closing: 1,
-          opening: 1,
-        },
-      },
-    ]);
-    req.data = merchants;
-    next();
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      data: { message: error.message },
-    });
-  }
-};
-
-export const getFavorites = async (req, _, next) => {
-  try {
-    const merchants = await Merchant.aggregate([
-      { $match: { favorites: { $elemMatch: { user: req.userId } } } },
-      {
-        $project: {
-          id: '$_id',
-          name: 1,
-          image: 1,
-          rates: 1,
-          categories: 1,
-          closing: 1,
-          opening: 1,
-          rates: { $size: '$reviews' },
-          ratings: { $avg: '$reviews.rate' },
-        },
-      },
-      {
-        $set: { favorite: true },
-      },
-    ]);
-    req.data = merchants;
-    next();
-  } catch (error) {
-    res.status(500).json({
-      data: { message: error.message },
-    });
-  }
-};
-export const favorite = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const merchant = await Merchant.findById(id);
-    const index = merchant.favorites.findIndex(
-      ({ user_id }) => user_id === req.userId
-    );
-    const updatedMerchant =
-      index === -1
-        ? await Merchant.updateOne(
-            { _id: mongoose.Types.ObjectId(id) },
-            { $push: { favorites: { user: req.userId } } },
-            { new: true }
-          )
-        : await Merchant.updateOne(
-            { _id: mongoose.Types.ObjectId(id) },
-            { $pull: { favorites: { user: req.userId } } },
-            { new: true }
-          );
-    if (updatedMerchant.acknowledged === true) {
-      res.status(201).json({
-        data: {
-          message:
-            index === -1
-              ? 'Added to your favorite'
-              : 'Removed to your favorite',
-        },
-      });
-    } else {
-      res
-        .status(500)
-        .json({ data: { message: 'Unable to complete operation' } });
-    }
-  } catch (error) {
-    res.status(500).json({
-      data: { message: error.message },
-    });
-  }
-};
+import Review from '../models/Review.js';
 
 export const createMerchant = async (req, res, next) => {
   try {
@@ -166,6 +28,7 @@ export const createMerchant = async (req, res, next) => {
     const savedMerchant = await newMerchant.save();
 
     const merchant = await Merchant.findById(savedMerchant._id)
+      .lean()
       .populate({
         path: 'categories',
       })
@@ -176,7 +39,7 @@ export const createMerchant = async (req, res, next) => {
           populate: {
             path: 'option_sections',
             populate: {
-              path: 'option',
+              path: 'options',
             },
           },
         },
@@ -192,27 +55,11 @@ export const createMerchant = async (req, res, next) => {
   }
 };
 
-export const updateMerchant = async (req, res, next) => {
-  const { id } = req.params;
-  const { name, image, categories, opening, closing, location } = req.body;
+export const getMerchant = async (req, res, next) => {
+  const { merchantId } = req.params;
   try {
-    const updatedMerchant = await Merchant.findByIdAndUpdate(
-      {
-        _id: mongoose.Types.ObjectId(id),
-      },
-      {
-        $set: {
-          name: name,
-          image: image,
-          categories: categories,
-          opening: opening,
-          closing: closing,
-          location: location,
-        },
-      },
-      { new: true }
-    );
-    const merchant = await Merchant.findById(updatedMerchant._id)
+    const merchant = await Merchant.findById(merchantId)
+      .lean()
       .populate({
         path: 'categories',
       })
@@ -223,7 +70,166 @@ export const updateMerchant = async (req, res, next) => {
           populate: {
             path: 'option_sections',
             populate: {
-              path: 'option',
+              path: 'options',
+            },
+          },
+        },
+      })
+      .populate({
+        path: 'reviews',
+        populate: {
+          path: 'user',
+        },
+      });
+    req.data = [merchant];
+    next();
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const getMerchants = async (req, res, next) => {
+  try {
+    const searchTerm = req.query.searchTerm;
+    if (searchTerm) {
+      const merchants = await Merchant.aggregate([
+        {
+          $lookup: {
+            from: 'productsections',
+            localField: 'product_sections',
+            foreignField: '_id',
+            as: 'productSections',
+          },
+        },
+        {
+          $unwind: '$productSections',
+        },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'productSections.products',
+            foreignField: '_id',
+            as: 'products',
+          },
+        },
+        {
+          $unwind: '$products',
+        },
+        {
+          $lookup: {
+            from: 'reviews',
+            localField: 'reviews',
+            foreignField: '_id',
+            as: 'reviews',
+          },
+        },
+        {
+          $unwind: {
+            path: '$reviews',
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'reviews.user',
+            foreignField: '_id',
+            as: 'reviews.user',
+          },
+        },
+        {
+          $unwind: {
+            path: '$reviews.user',
+          },
+        },
+        {
+          $match: {
+            $or: [
+              { name: { $regex: searchTerm, $options: 'i' } },
+              { 'products.name': { $regex: searchTerm, $options: 'i' } },
+              {
+                'products.description': { $regex: searchTerm, $options: 'i' },
+              },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: '$_id',
+            name: { $first: '$name' },
+            image: { $first: '$image' },
+            location: { $first: '$location' },
+            opening: { $first: '$opening' },
+            closing: { $first: '$closing' },
+            reviews: {
+              $push: {
+                _id: '$reviews._id',
+                rating: '$reviews.rating',
+                comment: '$reviews.comment',
+                user: '$reviews.user',
+              },
+            },
+            created_at: { $first: '$created_at' },
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $sort: { count: -1 },
+        },
+      ]);
+      req.data = merchants;
+      next();
+    } else {
+      const merchants = await Merchant.find({})
+        .lean()
+        .select('-product_sections')
+        .populate({
+          path: 'reviews',
+          populate: {
+            path: 'user',
+          },
+        });
+      req.data = merchants;
+      next();
+    }
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const updateMerchant = async (req, res, next) => {
+  const { merchantId } = req.params;
+  const { name, image, opening, closing, location } = req.body;
+  try {
+    const merchant = await Merchant.findByIdAndUpdate(
+      {
+        _id: mongoose.Types.ObjectId(merchantId),
+      },
+      {
+        $set: {
+          name: name,
+          image: image,
+          opening: opening,
+          closing: closing,
+          location: location,
+        },
+      },
+      { new: true }
+    )
+      .populate({
+        path: 'categories',
+      })
+      .populate({
+        path: 'product_sections',
+        populate: {
+          path: 'products',
+          populate: {
+            path: 'option_sections',
+            populate: {
+              path: 'options',
             },
           },
         },
@@ -238,16 +244,17 @@ export const updateMerchant = async (req, res, next) => {
 };
 
 export const addProductSection = async (req, res, next) => {
-  const { id } = req.params;
+  const { merchantId } = req.params;
   const { productSection } = req.body;
+
   try {
     const newProductSection = new ProductSection(productSection);
     const savedProductSection = await newProductSection.save();
 
     const merchant = await Merchant.findByIdAndUpdate(
-      id,
+      merchantId,
       { $push: { product_sections: savedProductSection._id } },
-      { new: true, useFindAndModify: false }
+      { new: true }
     )
       .populate({
         path: 'categories',
@@ -259,7 +266,7 @@ export const addProductSection = async (req, res, next) => {
           populate: {
             path: 'option_sections',
             populate: {
-              path: 'option',
+              path: 'options',
             },
           },
         },
@@ -274,7 +281,7 @@ export const addProductSection = async (req, res, next) => {
 };
 
 export const editProductSection = async (req, res, next) => {
-  const { id } = req.params;
+  const { merchantId } = req.params;
   const { productSectionId } = req.params;
   const { productSection } = req.body;
   try {
@@ -283,11 +290,11 @@ export const editProductSection = async (req, res, next) => {
         _id: mongoose.Types.ObjectId(productSectionId),
       },
       {
-        $set: productSection,
+        $set: { name: productSection.name },
       },
       { new: true }
     );
-    const merchant = await Merchant.findById(id)
+    const merchant = await Merchant.findById(merchantId)
       .populate({
         path: 'categories',
       })
@@ -298,7 +305,7 @@ export const editProductSection = async (req, res, next) => {
           populate: {
             path: 'option_sections',
             populate: {
-              path: 'option',
+              path: 'options',
             },
           },
         },
@@ -313,14 +320,14 @@ export const editProductSection = async (req, res, next) => {
 };
 
 export const deleteProductSection = async (req, res, next) => {
-  const { id } = req.params;
+  const { merchantId } = req.params;
   const { productSectionId } = req.params;
   try {
     await ProductSection.findByIdAndDelete(productSectionId);
     const merchant = await Merchant.findByIdAndUpdate(
-      id,
+      merchantId,
       { $pull: { product_sections: productSectionId } },
-      { new: true, useFindAndModify: false }
+      { new: true }
     )
       .populate({
         path: 'categories',
@@ -332,7 +339,7 @@ export const deleteProductSection = async (req, res, next) => {
           populate: {
             path: 'option_sections',
             populate: {
-              path: 'option',
+              path: 'options',
             },
           },
         },
@@ -347,20 +354,19 @@ export const deleteProductSection = async (req, res, next) => {
 };
 
 export const createProduct = async (req, res) => {
-  const { productSectionId } = req.params;
-  const { product } = req.body;
+  const { productSectionId, product } = req.body;
   try {
     const optionSections = [];
-    product.option_sections.forEach(async (section) => {
+    for (const section of product.option_sections) {
       const options = [];
-      section.options.forEach(async (option) => {
+      for (const option of section.options) {
         const newOption = new Option({
           name: option.name,
           price: option.price,
         });
         const savedOption = await newOption.save();
         options.push(savedOption._id);
-      });
+      }
       const newOptionSection = new OptionSection({
         name: section.name,
         required: section.required,
@@ -368,7 +374,7 @@ export const createProduct = async (req, res) => {
       });
       const savedOptonSection = await newOptionSection.save();
       optionSections.push(savedOptonSection._id);
-    });
+    }
     const newProduct = new Product({
       name: product.name,
       description: product.description,
@@ -377,11 +383,10 @@ export const createProduct = async (req, res) => {
       option_sections: optionSections,
     });
     const savedProduct = await newProduct.save();
-
     await ProductSection.findByIdAndUpdate(
       productSectionId,
       { $push: { products: savedProduct._id } },
-      { new: true, useFindAndModify: false }
+      { new: true }
     );
     res.status(201).json({
       data: {
@@ -396,25 +401,150 @@ export const createProduct = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
-  const { id, productSectionId, productId } = req.params;
   const { product } = req.body;
   try {
-    const updatedMerchant = await Merchant.updateOne(
+    const optionSections = [];
+    for (const section of product.option_sections) {
+      const options = [];
+      for (const option of section.options) {
+        const docs = await Option.findByIdAndUpdate(
+          option._id,
+          { $set: option },
+          {
+            new: true,
+          }
+        );
+        if (!docs) {
+          const newOption = new Option({
+            name: option.name,
+            price: option.price,
+          });
+          const savedOption = await newOption.save();
+          options.push(savedOption._id);
+        } else {
+          options.push(docs._id);
+        }
+      }
+      const docs = await OptionSection.findByIdAndUpdate(
+        section._id,
+        {
+          $set: {
+            name: section.name,
+            required: section.required,
+            options: options,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+      if (!docs) {
+        const newOptionSection = new OptionSection({
+          name: section.name,
+          required: section.required,
+          options: options,
+        });
+        const savedOptonSection = await newOptionSection.save();
+        optionSections.push(savedOptonSection._id);
+      } else {
+        optionSections.push(docs._id);
+      }
+    }
+
+    await Product.findOneAndUpdate(
       {
-        _id: mongoose.Types.ObjectId(id),
+        _id: mongoose.Types.ObjectId(product._id),
       },
-      { $set: { 'product_sections.$[section].products.$[product]': product } },
       {
-        arrayFilters: [
-          { 'section._id': mongoose.Types.ObjectId(productSectionId) },
-          { 'product._id': mongoose.Types.ObjectId(productId) },
-        ],
+        $set: {
+          name: product.name,
+          description: product.description,
+          image: product.image,
+          price: product.price,
+          option_sections: optionSections,
+        },
       }
     );
+    res.status(200).json({
+      data: {
+        message: 'Product updated',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const deleteProduct = async (req, res) => {
+  const { productSectionId, productId } = req.body;
+  try {
+    await Product.findByIdAndDelete(productId);
+    await ProductSection.findByIdAndUpdate(productSectionId, {
+      $pull: { products: productId },
+    });
+    res.status(204).json({ data: { message: 'Product deleted' } });
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const getFavorites = async (req, _, next) => {
+  try {
+    const merchants = await Merchant.find({ favorites: req.userId })
+      .populate({
+        path: 'categories',
+      })
+      .populate({
+        path: 'product_sections',
+        populate: {
+          path: 'products',
+          populate: {
+            path: 'option_sections',
+            populate: {
+              path: 'options',
+            },
+          },
+        },
+      });
+    req.data = merchants;
+    next();
+  } catch (error) {
+    res.status(500).json({
+      data: { message: error.message },
+    });
+  }
+};
+
+export const favorite = async (req, res) => {
+  const { merchantId } = req.params;
+  try {
+    const merchant = await Merchant.findById(id);
+    const index = merchant.favorites.findIndex(
+      ({ user_id }) => user_id === req.userId
+    );
+    const updatedMerchant =
+      index === -1
+        ? await Merchant.updateOne(
+            { _id: mongoose.Types.ObjectId(merchantId) },
+            { $push: { favorites: req.userId } },
+            { new: true }
+          )
+        : await Merchant.updateOne(
+            { _id: mongoose.Types.ObjectId(merchantId) },
+            { $pull: { favorites: req.userId } },
+            { new: true }
+          );
     if (updatedMerchant.acknowledged === true) {
-      res.status(200).json({
+      res.status(201).json({
         data: {
-          message: 'Product updated',
+          message:
+            index === -1
+              ? 'Added to your favorite'
+              : 'Removed to your favorite',
         },
       });
     } else {
@@ -429,33 +559,26 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-export const deleteProduct = async (req, res) => {
-  const { id, productSectionId, productId } = req.params;
+export const createReview = async (req, res) => {
+  const { merchantId, rating, comment } = req.body;
   try {
-    const updatedMerchant = await Merchant.updateOne(
-      {
-        _id: mongoose.Types.ObjectId(id),
-      },
-      {
-        $pull: {
-          'product_sections.$[section].products': {
-            _id: mongoose.Types.ObjectId(productId),
-          },
-        },
-      },
-      {
-        arrayFilters: [
-          { 'section._id': mongoose.Types.ObjectId(productSectionId) },
-        ],
-      }
+    const newReview = new Review({
+      user: req.userId,
+      rating: rating,
+      comment: comment,
+    });
+    const savedReview = await newReview.save();
+
+    await Merchant.updateOne(
+      { _id: mongoose.Types.ObjectId(merchantId) },
+      { $push: { reviews: savedReview._id } },
+      { new: true }
     );
-    if (updatedMerchant.acknowledged === true) {
-      res.status(204).json({ data: { message: 'Product deleted' } });
-    } else {
-      res
-        .status(500)
-        .json({ data: { message: 'Unable to complete operation' } });
-    }
+    res.status(201).json({
+      data: {
+        message: 'Review successfully saved',
+      },
+    });
   } catch (error) {
     res.status(500).json({
       data: { message: error.message },
